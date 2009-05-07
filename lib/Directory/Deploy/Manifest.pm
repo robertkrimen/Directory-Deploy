@@ -27,6 +27,22 @@ sub _enter {
     return $entry;
 }
 
+sub add {
+    my $self = shift;
+    croak "Wasn't given anything to add" unless @_;
+    my $kind = shift;
+    croak "You didn't specify a kind" unless defined $kind;
+    
+    if ($kind eq 'file') {
+        $self->file( @_ );
+    }
+    elsif ($kind eq 'dir') {
+        $self->dir( @_ );
+    }
+    else {
+        croak "Don't understand kind $kind";
+    }
+}
 sub file {
     my $self = shift;
     my %entry;

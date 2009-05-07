@@ -27,7 +27,7 @@ use Directory::Deploy::Maker;
 
 use Path::Class();
 
-has manifest => qw/is ro lazy_build 1/;
+has manifest => qw/is ro lazy_build 1/, handles => [qw/ add /];
 sub _build_manifest {
     return Directory::Deploy::Manifest->new();
 }
@@ -56,23 +56,6 @@ sub file {
 
 sub dir {
     return shift->base->subdir( @_ );
-}
-
-sub add {
-    my $self = shift;
-    croak "Wasn't given anything to add" unless @_;
-    my $kind = shift;
-    croak "You didn't specify a kind" unless defined $kind;
-    
-    if ($kind eq 'file') {
-        $self->manifest->file( @_ );
-    }
-    elsif ($kind eq 'dir') {
-        $self->manifest->dir( @_ );
-    }
-    else {
-        croak "Don't understand kind $kind";
-    }
 }
 
 sub deploy {
