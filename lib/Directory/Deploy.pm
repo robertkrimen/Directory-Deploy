@@ -5,7 +5,7 @@ use strict;
 
 =head1 NAME
 
-Directory::Deploy - The great new Directory::Deploy!
+Directory::Deploy -
 
 =head1 VERSION
 
@@ -15,37 +15,78 @@ Version 0.01
 
 our $VERSION = '0.01';
 
-
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
-
-    use Directory::Deploy;
-
-    my $foo = Directory::Deploy->new();
-    ...
-
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
-=head1 FUNCTIONS
-
-=head2 function1
-
 =cut
 
-sub function1 {
+use Moose;
+
+use Directory::Deploy::Carp;
+use Directory::Deploy::Manifest;
+use Directory::Deploy::Maker;
+
+use Path::Class();
+
+has manifest => qw/is ro lazy_build 1/;
+sub _build_manifest {
+    return Directory::Deploy::Manifest->new();
 }
 
-=head2 function2
+has maker => qw/is ro lazy_build 1/;
+sub _build_maker {
+    my $self = shift;
+    return Directory::Deploy::Maker->new( deploy => $self );
+}
 
-=cut
+has base => qw/accessor _base required 1/;
+sub base {
+    my $self = shift;
+    return $self->_base( @_ );
+}
 
-sub function2 {
+sub BUILD {
+    my $self = shift;
+
+    $self->_base( Path::Class::Dir->new( $self->_base ) );
+}
+
+sub file {
+    return shift->base->file( @_ );
+}
+
+sub dir {
+    return shift->base->subdir( @_ );
+}
+
+sub add {
+    my $self = shift;
+    croak "Wasn't given anything to add" unless @_;
+    my $kind = shift;
+    croak "You didn't specify a kind" unless defined $kind;
+    
+    if ($kind eq 'file') {
+        $self->manifest->file( @_ );
+    }
+    elsif ($kind eq 'dir') {
+        $self->manifest->dir( @_ );
+    }
+    else {
+        croak "Don't understand kind $kind";
+    }
+}
+
+sub deploy {
+    my $self = shift;
+    if (! ref $self) { # Invoked as a class method
+        my $new_arguments;
+        $new_arguments = shift if ref $_[0] eq 'HASH';
+        return $self->new( $new_arguments )->deploy( @_ );
+    }
+
+    $self->manifest->each( sub {
+        my ($entry) = @_;
+        $self->maker->make( $entry );
+    } );
 }
 
 =head1 AUTHOR
