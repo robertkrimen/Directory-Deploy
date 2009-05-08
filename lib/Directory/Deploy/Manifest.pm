@@ -43,6 +43,7 @@ sub add {
         croak "Don't understand kind $kind";
     }
 }
+
 sub file {
     my $self = shift;
     my %entry;
@@ -86,6 +87,12 @@ sub dir {
     my $entry = Directory::Deploy::Manifest::Dir->new( %entry, @_ );
     $self->_enter( $entry );
     return $entry;
+}
+
+sub include {
+
+    # ... Code goes here ...
+
 }
 
 sub lookup {
