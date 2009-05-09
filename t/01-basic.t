@@ -16,14 +16,14 @@ $scratch = Directory::Scratch->new;
 $deploy = Directory::Deploy->new( base => $scratch->base );
 $manifest = $deploy->manifest;
 
-$manifest->file( 'apple' => content => \<<_END_ );
+$manifest->add( 'apple' => content => \<<_END_ );
 Hello, World.
 _END_
-$manifest->dir( 'banana' );
-$deploy->add( file => '/cherry/grape', \<<_END_ );
+$manifest->add( 'banana/' );
+$deploy->add( '/cherry/grape', \<<_END_ );
 Mmm, fruity.
 _END_
-$deploy->add( dir => 'lime//' );
+$deploy->add( 'lime//' );
 
 
 $deploy->deploy;

@@ -27,63 +27,56 @@ sub _enter {
     return $entry;
 }
 
-sub add {
+has include_parser => qw/is ro required 1 isa CodeRef/, default => sub { sub {
     my $self = shift;
-    croak "Wasn't given anything to add" unless @_;
-    my $kind = shift;
-    croak "You didn't specify a kind" unless defined $kind;
-    
-    if ($kind eq 'file') {
-        $self->file( @_ );
-    }
-    elsif ($kind eq 'dir') {
-        $self->dir( @_ );
+    chomp;
+    return if m/^\s*$/ || m/^\s*#/;
+    my ($path, $content_source) = m/^\s*(\S+)(?:\s*(.*)\s*)?$/;
+    s/^\s*//, s/\s*$// for $path;
+    $self->add( path => $path, content_source => $content_source );
+} };
+sub include {
+    my $self = shift;
+    if (1 == @_ || ref $_[0] eq 'SCALAR') {
+        my $parse = shift;
+        croak "More than one argument passed to include" if @_;
+        my $parser = $self->include_parser;
+        $parse = $$parse if ref $_[0] eq 'SCALAR';
+        $parser->( $self, $_ ) for split m/\n/, $parse;
     }
     else {
-        croak "Don't understand kind $kind";
+        while (@_) {
+            my $path = shift;
+            my $value = shift;
+            $self->add( $path => (ref $value eq 'HASH' ? %$value : $value) );
+        }
     }
 }
-sub file {
+
+sub add {
     my $self = shift;
     my %entry;
     if (1 == @_) {
         $entry{path} = shift;
     }
-    elsif (2 == @_ && ref $_[1] eq 'SCALAR') {
+    elsif (2 == @_ && $_[0] && $_[0] ne 'path') {
         $entry{path} = shift;
-        $entry{content} = shift;
-    }
-    elsif (3 == @_) {
-        $entry{path} = shift;
-        if (ref $_[0] eq 'SCALAR' && $_[1] =~ m/^\d+$/) {
-            $entry{content} = shift;
-            $entry{mode} = shift;
+        my $source_or_content = shift;
+        if (ref $source_or_content eq 'SCALAR') {
+            $entry{content} = $source_or_content;
         }
-        elsif (ref $_[1] eq 'SCALAR' && $_[0] =~ m/^\d+$/) {
-            $entry{mode} = shift;
-            $entry{content} = shift;
+        elsif (! ref $source_or_content) {
+            $entry{content_source} = $source_or_content;
+        }
+        else {
+            confess "Huh, don't know what $source_or_content is";
         }
     }
     elsif (@_ % 2) {
         $entry{path} = shift;
     }
 
-    my $entry = Directory::Deploy::Manifest::File->new( %entry, @_ );
-    $self->_enter( $entry );
-    return $entry;
-}
-
-sub dir {
-    my $self = shift;
-    my %entry;
-    if (1 == @_) {
-        $entry{path} = shift;
-    }
-    elsif (@_ % 2) {
-        $entry{path} = shift;
-    }
-
-    my $entry = Directory::Deploy::Manifest::Dir->new( %entry, @_ );
+    my $entry = Directory::Deploy::Manifest::Entry->new( %entry, @_ );
     $self->_enter( $entry );
     return $entry;
 }
@@ -112,14 +105,134 @@ sub each {
     }
 }
 
-#has parser => qw/is ro required 1 isa CodeRef/, default => sub { sub {
+package Directory::Deploy::Manifest::Entry;
+
+use Moose;
+
+use Directory::Deploy::Carp;
+
+has is_file => qw/is rw/;
+sub is_dir { return ! shift->is_file }
+has mode => qw/is rw isa Maybe[Int]/;
+has path => qw/is ro required 1/;
+has comment => qw/is rw isa Maybe[Str]/;
+has content => qw/is rw/;
+has content_source => qw/is rw/;
+
+sub path_like_file {
+    my $self = shift; # Probably $class
+    my $path = shift;
+
+    my $trailing_slash = $path =~ m/\/(?::\d+)?$/; # Optional octal mode at the end
+
+    return ! $trailing_slash;
+}
+
+sub parse_path {
+    my $self = shift; # Probably $class
+    my $path = shift;
+
+    croak "Wasn't given a path to parse" unless defined $path && length $path;
+
+    my $mode;
+    $mode = oct $1 if $path =~ s/:(\d+)$//;
+    
+    my $is_file;
+    $is_file = ! ($path =~ s{/+$}{}); # Trailing slash(es) is a directory indicator
+
+    return (
+        Directory::Deploy::Manifest->normalize_path( $path ), 
+        $is_file,
+        $mode,
+    );
+}
+
+sub BUILD {
+    my $self = shift;
+    my $given = shift;
+
+    my ($path, $is_file, $mode) = $self->parse_path( $self->path );
+
+    if ($given->{is_dir}) {
+        $self->is_file( 0 );
+    }
+    elsif ($given->{is_file}) {
+    }
+    else {
+        $self->is_file( $is_file );
+    }
+
+    unless (defined $given->{mode}) {
+        $self->mode( $mode );
+    }
+
+    $self->{path} = $path;
+}
+
+1;
+
+__END__
+#sub add {
 #    my $self = shift;
-#    chomp;
-#    return if m/^\s*$/ || m/^\s*#/;
-#    my ($path, $comment) = m/^\s*([^#\s]+)(?:\s*#\s*(.*))?$/;
-#    s/^\s*//, s/\s*$// for $path;
-#    $self->add(path => $path, comment => $comment);
-#} };
+#    my $kind = shift;
+#    croak "You didn't specify a kind" unless defined $kind;
+#    
+#    if ($kind eq 'file') {
+#        $self->file( @_ );
+#    }
+#    elsif ($kind eq 'dir') {
+#        $self->dir( @_ );
+#    }
+#    else {
+#        croak "Don't understand kind $kind";
+#    }
+#}
+
+#sub file {
+#    my $self = shift;
+#    my %entry;
+#    if (1 == @_) {
+#        $entry{path} = shift;
+#    }
+#    elsif (2 == @_ && ref $_[1] eq 'SCALAR') {
+#        $entry{path} = shift;
+#        $entry{content} = shift;
+#    }
+#    elsif (3 == @_) {
+#        $entry{path} = shift;
+#        if (ref $_[0] eq 'SCALAR' && $_[1] =~ m/^\d+$/) {
+#            $entry{content} = shift;
+#            $entry{mode} = shift;
+#        }
+#        elsif (ref $_[1] eq 'SCALAR' && $_[0] =~ m/^\d+$/) {
+#            $entry{mode} = shift;
+#            $entry{content} = shift;
+#        }
+#    }
+#    elsif (@_ % 2) {
+#        $entry{path} = shift;
+#    }
+
+#    my $entry = Directory::Deploy::Manifest::Entry->new( %entry, @_ );
+#    $self->_enter( $entry );
+#    return $entry;
+#}
+
+#sub dir {
+#    my $self = shift;
+#    my %entry;
+#    if (1 == @_) {
+#        $entry{path} = shift;
+#    }
+#    elsif (@_ % 2) {
+#        $entry{path} = shift;
+#    }
+
+#    my $entry = Directory::Deploy::Manifest::Dir->new( %entry, @_ );
+#    $self->_enter( $entry );
+#    return $entry;
+#}
+
 #has _entry_list => qw/is ro required 1/, default => sub { {} };
 
 #sub _entry {
@@ -187,23 +300,6 @@ sub each {
 #    }
 #}
 
-package Directory::Deploy::Manifest::DoesEntry;
-
-use Moose::Role;
-
-requires qw/is_file/;
-
-has mode => qw/is rw isa Maybe[Int]/;
-has path => qw/is ro required 1/;
-has comment => qw/is rw isa Maybe[Str]/;
-has content => qw/is rw/;
-
-sub BUILD {
-    my $self = shift;
-    $self->{path} = Directory::Deploy::Manifest->normalize_path( $self->path );
-}
-
-sub is_dir { return ! shift->is_file }
 
 package Directory::Deploy::Manifest::File;
 

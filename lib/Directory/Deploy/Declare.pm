@@ -9,7 +9,7 @@ use Moose();
 use Moose::Exporter;
 
 Moose::Exporter->setup_import_methods(
-    with_caller => [qw/ file dir /],
+    with_caller => [qw/ add include /],
     also => [qw/ Moose /],
 );
 
@@ -32,15 +32,14 @@ sub initialize {
     return $deploy_meta;
 }
 
-sub file {
+sub add {
     my $class = shift;
-    __PACKAGE__->initialize( $class )->add_entry( file => @_ );
+    __PACKAGE__->initialize( $class )->add_replay( add => @_ );
 }
 
-
-sub dir {
+sub include {
     my $class = shift;
-    __PACKAGE__->initialize( $class )->add_entry( dir => @_ );
+    __PACKAGE__->initialize( $class )->add_replay( include => @_ );
 }
 
 1;
@@ -53,9 +52,9 @@ use warnings;
 use Moose;
 use MooseX::AttributeHelpers;
 
-has _entry_list => qw/metaclass Collection::Array is ro isa ArrayRef/, default => sub { [] }, provides => {qw/
-    push        _add_entry
-    elements    _entries
+has _replay_list => qw/metaclass Collection::Array is ro isa ArrayRef/, default => sub { [] }, provides => {qw/
+    push        _add_replay
+    elements    replay_list
 /};
 
 sub build {
@@ -63,13 +62,16 @@ sub build {
     my $deploy = shift;
     my $given = shift; # Called from BUILD
 
-    for my $entry ($self->_entries) {
-        $deploy->add( @$entry );
+    for my $replay ($self->replay_list) {
+        my @replay = @$replay;
+        my $method = shift @replay;
+        $deploy->$method( @replay );
     }
 }
 
-sub add_entry {
-    shift->_add_entry( [ @_ ] );
+sub add_replay {
+    my $self = shift;
+    $self->_add_replay( [ @_ ] );
 }
 
 1;

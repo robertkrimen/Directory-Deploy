@@ -14,17 +14,33 @@ package t::Deploy;
 
 use Directory::Deploy::Declare;
 
-file 'apple', \<<_END_;
+add 'apple', \<<_END_;
 Hello, World.
 _END_
 
-dir 'banana';
+add 'banana/';
 
-file '/cherry/grape', \<<_END_;
+add '/cherry/grape', \<<_END_;
 Mmm, fruity.
 _END_
 
-dir 'lime//';
+add 'lime//';
+
+include <<_END_;
+a/
+a/b
+c/d/e/
+_END_
+
+include 
+    'f' => { mode => 0666 },
+    'g:666' => {},
+    'h/i:600' => \<<_END_;
+This is h/i
+_END_
+;
+    
+    
 
 no Directory::Deploy::Declare;
 
@@ -51,6 +67,19 @@ Mmm, fruity.
 _END_
 
     ok( -d $scratch->dir( 'lime' ) );
+
+    ok( -d $scratch->dir( 'a' ) );
+    ok( -f $scratch->file( 'a/b' ) );
+    ok( -d $scratch->dir( 'c/d/e' ) );
+    ok( -f $scratch->file( 'f' ) );
+    is( (stat _)[2] & 07777, 0666 );
+    ok( -f $scratch->file( 'g' ) );
+    is( (stat _)[2] & 07777, 0666 );
+    ok( -f $scratch->file( 'h/i' ) );
+    is( (stat _)[2] & 07777, 0600 );
+    is( $scratch->read( 'h/i' )."\n", <<_END_ );
+This is h/i
+_END_
 }
 
 {

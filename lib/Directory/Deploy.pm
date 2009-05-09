@@ -27,7 +27,7 @@ use Directory::Deploy::Maker;
 
 use Path::Class();
 
-has manifest => qw/is ro lazy_build 1/, handles => [qw/ add /];
+has manifest => qw/is ro lazy_build 1/, handles => [qw/ add include /];
 sub _build_manifest {
     return Directory::Deploy::Manifest->new();
 }
