@@ -5,18 +5,87 @@ use strict;
 
 =head1 NAME
 
-Directory::Deploy -
+Directory::Deploy - Create files and directories on disk
 
 =head1 VERSION
 
-Version 0.01
+Version 0.001
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.001';
 
 =head1 SYNOPSIS
 
+    package My::Assets;
+
+    use Directory::Deploy::Declare;
+
+    include <<'_END_';
+# A line beginning with '#' is ignored
+run/
+# A path with a trailing slash is a directory (otherwise a file)
+run/root/
+run/tmp/:700
+# A :\d+ after a path is the mode (permissions) for the file/dir
+assets/
+assets/root/
+assets/root/static/
+assets/root/static/css/
+assets/root/static/js/
+assets/tt/
+_END_
+
+    include
+        'assets/tt/frame.tt.html' => \<<'_END_',
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>[% title %]</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+</head>
+<body>
+<div id="doc2">
+
+    [% content %]
+
+    <div class="footer"> ... </div>
+
+</div>
+</body>
+</html>
+_END_
+        'assets/root/static/css/base.css' => \<<'_END_',
+body, table {
+    font-family: Verdana, Arial, sans-serif;
+    background-color: #fff;
+}
+
+a, a:hover, a:active, a:visited {
+    text-decoration: none;
+    font-weight: bold;
+    color: #436b95;
+}
+_END_
+    ; # End of the include
+
+    no Directory::Deploy::Declare;
+
+    # ... elsewhere ...
+
+    My::Assets->deploy( { base => $dir } )
+
+    # ... or ...
+
+    my $assets = My::Assets->new( base => $dir )
+    $assets->deploy
+
+=head1 DESCRIPTION
+
+Directory::Deploy is a tool for creating files and directories (on disk)
+
+The usage is pretty much as the SYNOPSIS says. Caveat emptor: the interface is Beta(tm) and *might* change
+    
 =cut
 
 use Moose;
